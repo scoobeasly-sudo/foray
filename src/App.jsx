@@ -459,7 +459,7 @@ function FlashcardDay({ day, onComplete }) {
         const card = deck[idx];
         const newDeck = [...deck.filter((_,i) => i !== idx), card];
         setDeck(newDeck);
-        setTotal(t => t + 1);
+        
         setIdx(i => Math.min(i, newDeck.length - 1));
       }
     }, 200);

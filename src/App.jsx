@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 
 const TOPICS_FLOAT = ["guitar","sourdough","python","photography","watercolour","yoga","chess","beatboxing","car maintenance","investing","french","pottery","sketching","meditation","filmmaking","astronomy","salsa","calligraphy","gardening","ukulele","origami","baking","piano","cooking","drawing","spanish","knitting","reels","editing"];
 
-// eslint-disable-next-line no-unused-vars
 const CONTEXT_QUESTIONS = {
   cooking: [{q:"What's your food background?",opts:["Indian","East Asian","Mediterranean","Western","Mixed / Other"]},{q:"Do you have a kitchen available?",opts:["Yes, fully equipped","Basic kitchen","Limited — just a hob","Not right now"]}],
   language: [{q:"What's your native language?",opts:["English","Hindi","Spanish","French","Other"]},{q:"Why are you learning it?",opts:["Travel","Work","Heritage / family","Just curious"]}],
@@ -213,8 +212,8 @@ function AITutor({ topic, dayTitle, context }) {
     setMsgs(m=>[...m,{role:"user",text:msg}]); setLoading(true);
     try {
       const history = msgs.filter(m=>m.role==="user").map(m=>({role:"user",content:m.text}));
-      const res = await fetch("/api/generate",{
-        method:"POST",headers:{"Content-Type":"application/json","x-api-key":process.env.REACT_APP_ANTHROPIC_KEY,"anthropic-version":"2023-06-01"},
+      const res = await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:350,
           system:`Expert tutor for "${topic}". Current lesson: "${dayTitle}". Context: ${JSON.stringify(context)}. Be specific, practical, encouraging. Max 3 sentences. Never waffle. If they describe a problem, give ONE precise fix.`,
           messages:[...history,{role:"user",content:msg}]})
@@ -299,7 +298,17 @@ function VideoEmbed({ videoId, searchQuery, title }) {
 function QuizBlock({ quiz, onCorrect }) {
   const [ans, setAns] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [attempts, setAttempts] = useState(0);
   const correct = submitted && ans === quiz.correct;
+
+  const handleCheck = () => {
+    const isCorrect = ans === quiz.correct;
+    setSubmitted(true);
+    setAttempts(a => a + 1);
+    if(isCorrect && onCorrect) onCorrect();
+  };
+
+  const handleRetry = () => { setAns(null); setSubmitted(false); };
 
   return (
     <div style={{background:"white",borderRadius:"14px",border:"2px solid #E8DDD0",padding:"1.1rem",marginBottom:".9rem"}}>
@@ -314,11 +323,19 @@ function QuizBlock({ quiz, onCorrect }) {
         })}
       </div>
       {ans!==null&&!submitted&&(
-        <button onClick={()=>{setSubmitted(true);if(ans===quiz.correct&&onCorrect)onCorrect();}} className="btn-primary" style={{marginTop:".8rem",padding:"10px 22px",borderRadius:"10px",fontSize:".88rem"}}>Check →</button>
+        <button onClick={handleCheck} className="btn-primary" style={{marginTop:".8rem",padding:"10px 22px",borderRadius:"10px",fontSize:".88rem"}}>Check →</button>
       )}
       {submitted&&(
-        <div className="popin" style={{marginTop:".7rem",padding:".8rem",borderRadius:"10px",background:correct?"rgba(45,122,79,.08)":"rgba(196,98,45,.08)",fontSize:".84rem",color:correct?"#2D7A4F":"#C4622D",fontWeight:"500",lineHeight:1.55}}>
-          {correct?"✓ Correct! ":"✗ Not quite — "}{quiz.explanation||quiz.options[quiz.correct]}
+        <div className="popin">
+          <div style={{marginTop:".7rem",padding:".8rem",borderRadius:"10px",background:correct?"rgba(45,122,79,.08)":"rgba(196,98,45,.08)",fontSize:".84rem",color:correct?"#2D7A4F":"#C4622D",fontWeight:"500",lineHeight:1.55}}>
+            {correct?"✓ Correct! ":"✗ Not quite — "}{quiz.explanation||quiz.options[quiz.correct]}
+          </div>
+          {!correct && attempts < 2 && (
+            <button onClick={handleRetry} className="btn-ghost" style={{marginTop:".7rem",width:"100%",padding:"10px",borderRadius:"10px",fontSize:".88rem"}}>Try again →</button>
+          )}
+          {(!correct && attempts >= 2 && onCorrect) && (
+            <button onClick={onCorrect} className="btn-primary" style={{marginTop:".7rem",width:"100%",padding:"10px",borderRadius:"10px",fontSize:".88rem"}}>Continue anyway →</button>
+          )}
         </div>
       )}
     </div>
@@ -420,28 +437,50 @@ function WatchDay({ day, onComplete }) {
 }
 
 function FlashcardDay({ day, onComplete }) {
+  const [deck, setDeck] = useState(() => [...(day.flashcards||[])]);
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [score, setScore] = useState(0);
+  const [total, setTotal] = useState((day.flashcards||[]).length);
   const [done, setDone] = useState(false);
-  const cards = day.flashcards||[];
-  const next = knew => { if(knew)setScore(s=>s+1); setFlipped(false); setTimeout(()=>{ if(idx<cards.length-1)setIdx(i=>i+1); else setDone(true); },200); };
+
+  const next = knew => {
+    setFlipped(false);
+    setTimeout(() => {
+      if(knew) {
+        setScore(s => s + 1);
+        const newDeck = deck.filter((_,i) => i !== idx);
+        if(newDeck.length === 0) { setDone(true); return; }
+        setDeck(newDeck);
+        setIdx(i => Math.min(i, newDeck.length - 1));
+      } else {
+        // move card to end of deck
+        const card = deck[idx];
+        const newDeck = [...deck.filter((_,i) => i !== idx), card];
+        setDeck(newDeck);
+        setTotal(t => t + 1);
+        setIdx(i => Math.min(i, newDeck.length - 1));
+      }
+    }, 200);
+  };
+
   if(done) return (
     <div className="fadein" style={{textAlign:"center",padding:"1.5rem 0"}}>
       <div style={{fontSize:"2.8rem",marginBottom:".7rem"}}>⚡</div>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:"1.3rem",color:"#1C3A2B",marginBottom:".4rem"}}>Sprint done</div>
-      <div style={{color:"#8B7355",marginBottom:"1.5rem"}}>{score}/{cards.length} nailed · {Math.round(score/cards.length*100)}%</div>
+      <div style={{color:"#8B7355",marginBottom:"1.5rem"}}>{score} cards mastered</div>
       <button onClick={onComplete} className="btn-primary" style={{width:"100%",padding:"14px",borderRadius:"14px",fontSize:".95rem"}}>Complete day →</button>
     </div>
   );
-  const card = cards[idx];
+
+  const card = deck[idx];
   return (
     <div className="fadein">
       <div className="tag" style={{color:"#C4622D",marginBottom:".4rem"}}>⚡ Flashcard Sprint</div>
       <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",color:"#1C3A2B",marginBottom:".5rem",fontWeight:"400"}}>{day.title}</h1>
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:"1.1rem"}}>
-        <span style={{fontSize:".8rem",color:"#8B7355"}}>{idx+1}/{cards.length}</span>
-        <span style={{fontSize:".8rem",color:"#C4622D",fontWeight:"500"}}>Score: {score}</span>
+        <span style={{fontSize:".8rem",color:"#8B7355"}}>{deck.length} remaining</span>
+        <span style={{fontSize:".8rem",color:"#C4622D",fontWeight:"500"}}>Mastered: {score}</span>
       </div>
       <div className={`fc ${flipped?"flipped":""}`} style={{height:"190px",marginBottom:"1rem"}} onClick={()=>setFlipped(!flipped)}>
         <div className="fc-inner">
@@ -449,11 +488,16 @@ function FlashcardDay({ day, onComplete }) {
           <div className="fc-back" style={{background:"white",border:"2px solid #C4622D"}}><div style={{fontSize:".88rem",color:"#2C1810",lineHeight:1.65}}>{card.back}</div></div>
         </div>
       </div>
-      {!flipped?<p style={{textAlign:"center",fontSize:".8rem",color:"#8B7355",fontStyle:"italic"}}>Tap to reveal →</p>
-      :<div style={{display:"flex",gap:".7rem"}} className="popin">
-        <button className="btn-ghost" onClick={()=>next(false)} style={{flex:1,padding:"13px",borderRadius:"12px",fontSize:".9rem"}}>Not yet</button>
-        <button className="btn-primary" onClick={()=>next(true)} style={{flex:1,padding:"13px",borderRadius:"12px",fontSize:".9rem"}}>Got it ✓</button>
-      </div>}
+      {!flipped
+        ? <p style={{textAlign:"center",fontSize:".8rem",color:"#8B7355",fontStyle:"italic"}}>Tap to reveal →</p>
+        : <div style={{display:"flex",gap:".7rem"}} className="popin">
+            <button className="btn-ghost" onClick={()=>next(false)} style={{flex:1,padding:"13px",borderRadius:"12px",fontSize:".9rem"}}>Not yet 🔁</button>
+            <button className="btn-primary" onClick={()=>next(true)} style={{flex:1,padding:"13px",borderRadius:"12px",fontSize:".9rem"}}>Got it ✓</button>
+          </div>
+      }
+      {!flipped && deck.length < (day.flashcards||[]).length && (
+        <p style={{textAlign:"center",fontSize:".75rem",color:"#C4622D",marginTop:".5rem",fontStyle:"italic"}}>Cards you don't know yet will come back around</p>
+      )}
     </div>
   );
 }
@@ -641,8 +685,8 @@ export default function Foray() {
     setScreen("generating");
     setError(null);
     try {
-      const res = await fetch("/api/generate",{
-        method:"POST",headers:{"Content-Type":"application/json","x-api-key":process.env.REACT_APP_ANTHROPIC_KEY,"anthropic-version":"2023-06-01"},
+      const res = await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:6000,
           messages:[{role:"user",content:buildDeepPrompt(topic,timePerDay,contextQ,contextAns,mastery)}]})
       });

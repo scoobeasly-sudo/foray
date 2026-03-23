@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const TOPICS_FLOAT = ["guitar","sourdough","python","photography","watercolour","yoga","chess","beatboxing","car maintenance","investing","french","pottery","sketching","meditation","filmmaking","astronomy","salsa","calligraphy","gardening","ukulele","origami","baking","piano","cooking","drawing","spanish","knitting","reels","editing"];
 
+// eslint-disable-next-line no-unused-vars
 const CONTEXT_QUESTIONS = {
   cooking: [{q:"What's your food background?",opts:["Indian","East Asian","Mediterranean","Western","Mixed / Other"]},{q:"Do you have a kitchen available?",opts:["Yes, fully equipped","Basic kitchen","Limited — just a hob","Not right now"]}],
   language: [{q:"What's your native language?",opts:["English","Hindi","Spanish","French","Other"]},{q:"Why are you learning it?",opts:["Travel","Work","Heritage / family","Just curious"]}],
@@ -441,7 +442,7 @@ function FlashcardDay({ day, onComplete }) {
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [score, setScore] = useState(0);
-  const [total, setTotal] = useState((day.flashcards||[]).length);
+  
   const [done, setDone] = useState(false);
 
   const next = knew => {

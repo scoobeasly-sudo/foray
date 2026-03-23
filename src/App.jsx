@@ -213,7 +213,7 @@ function AITutor({ topic, dayTitle, context }) {
     setMsgs(m=>[...m,{role:"user",text:msg}]); setLoading(true);
     try {
       const history = msgs.filter(m=>m.role==="user").map(m=>({role:"user",content:m.text}));
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
+      const res = await fetch("/api/generate",{
         method:"POST",headers:{"Content-Type":"application/json","x-api-key":process.env.REACT_APP_ANTHROPIC_KEY,"anthropic-version":"2023-06-01"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:350,
           system:`Expert tutor for "${topic}". Current lesson: "${dayTitle}". Context: ${JSON.stringify(context)}. Be specific, practical, encouraging. Max 3 sentences. Never waffle. If they describe a problem, give ONE precise fix.`,
@@ -641,7 +641,7 @@ export default function Foray() {
     setScreen("generating");
     setError(null);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
+      const res = await fetch("/api/generate",{
         method:"POST",headers:{"Content-Type":"application/json","x-api-key":process.env.REACT_APP_ANTHROPIC_KEY,"anthropic-version":"2023-06-01"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:6000,
           messages:[{role:"user",content:buildDeepPrompt(topic,timePerDay,contextQ,contextAns,mastery)}]})
